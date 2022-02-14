@@ -110,9 +110,27 @@ def show_intro():
     print(banner)
     print("Starting...\n")
 
-def get_exam_distribution(driver,exam_url):
+
+def show_intro():
+    print("Opciones:\n")
+    print("1. Preparar examen (ordenar, mostrar distribución y mostrar reactivos sin explicación.)")
+    print("2. Transferir examen de una cuenta a otra.")
+    print("2. Transferir examen de un conjunto de exámenes a otro.")
+    print("3. Duplicar examen dentro de un mismo conjunto de exámenes.")
+
+
+
+def prepare_exam(driver,):
+dn = os.getcwd()
 print("Opening selenium...")
-driver.get(exam_url)
+chrome = configure_chrome_driver_no_profile(dn)
+email = input("Input your udemy email:")
+password = input("Input your udemy password:")
+login_into_udemy(chrome, email, password)
+
+exam_url = input("Input exam content url:") # Example https://www.udemy.com/instructor/course/4444014/manage/practice-tests   
+chrome.get(exam_url)
+
 # Remove Chat from pages
 try:
     element = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, '#webWidget')))
@@ -126,24 +144,43 @@ try:
 except:
     print('Contents already colapsed')
 
+ 
+
 exam_index = 0
 exam_sections = chrome.find_elements(By.CSS_SELECTOR, "li[id*='practice-test']")
 print("Number of elements detected {}".format(len(exam_sections)))
-questions = exam_sections[exam_index].find_elements(By.CSS_SELECTOR, 'div.quiz-editor--quiz-editor--2RKDC.default-item-editor--item-editor--3GhNq > div.default-item-editor--edit-content--HLXOq > div > div.quiz-editor--assessment-list--AusWI > ul > li > div')
-print("Number of questions detected {}".format(len(questions)))
 
-exam_knowledge_areas = []
-for question_index in range(0,len(questions)-1): 
+questions = exam_sections[exam_index].find_elements(By.CSS_SELECTOR, 'div.quiz-editor--quiz-editor--2RKDC.default-item-editor--item-editor--3GhNq > div.default-item-editor--edit-content--HLXOq > div > div.quiz-editor--assessment-list--AusWI > ul > li > div')
+print("Number of questions detected {} in exam {}".format(len(questions), str(exam_index)))
+
+
+# Order questiosn to his category
+print("Introduce las materias o categorías en el orden deseado:")
+topics_order = {}
+for i in range(9):    
+    topic_info = []
+    topic_info.append(input("Nombre de {} :".format(str(i))).upper())
+    topic_info.append(int(input("Num de reactivos:")))
+    topics_order[i] = topic_info
+
+# execute order
+#for question_index in range(0,len(questions)-1): 
+for question_index in range(0,10): 
+    exam_sections = chrome.find_elements(By.CSS_SELECTOR, "li[id*='practice-test']")
+    questions = exam_sections[exam_index].find_elements(By.CSS_SELECTOR, 'div.quiz-editor--quiz-editor--2RKDC.default-item-editor--item-editor--3GhNq > div.default-item-editor--edit-content--HLXOq > div > div.quiz-editor--assessment-list--AusWI > ul > li > div')
     # Open sender question    
     pencil_buttons = exam_sections[exam_index].find_elements(By.CSS_SELECTOR, 'div.quiz-editor--quiz-editor--2RKDC.default-item-editor--item-editor--3GhNq > div.default-item-editor--edit-content--HLXOq > div > div.quiz-editor--assessment-list--AusWI > ul > li')
     pencil_button = pencil_buttons[question_index].find_element(By.CSS_SELECTOR, 'span.udi.udi-pencil')
-    driver.execute_script("arguments[0].click();", pencil_button)
+    chrome.execute_script("arguments[0].click();", pencil_button)
+    # Check topic
     topic_radios = WebDriverWait(chrome, 20).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "form > div:nth-child(4) > div > label > input[type=radio]")))
-    knowledge_areas = chrome.find_elements_by_css_selector("#knowledge-area")
-    print("Number of topics {}".format(len(topic_radios)))
+    knowledge_areas = chrome.find_elements(By.CSS_SELECTOR,"#knowledge-area")
+    print("Number of topics {}".format(len(topic_radios)-1))
+    current_topic = ""
     for index in range(len(topic_radios)):
         if topic_radios[index].is_selected() and knowledge_areas[index].get_attribute('value'):
-            exam_knowledge_areas.append(knowledge_areas[index].get_attribute('value'))
+            current_topic = knowledge_areas[index].get_attribute('value')
+    print("Categoría actual: {}".format(current_topic))
     # Close question
     chrome.find_element_by_tag_name('html').send_keys(Keys.HOME) #Scrolls up to the top of the page   
     sender_close_question_button = chrome.find_element(By.CSS_SELECTOR,"button[data-purpose^='content-tab-close']")
@@ -151,48 +188,79 @@ for question_index in range(0,len(questions)-1):
     action.move_to_element(sender_close_question_button)
     action.perform()
     sender_close_question_button.click()
+    # Verrify if index question in correct range
+    topics_order_values = topics_order.values()
+    inferior_limit = 0
+    superior_limit = 0
+    correct_inferior_limit = 0
+    correct_superior_limit = 0
+    for element in topics_order_values:   
+        superior_limit = inferior_limit + int(element[1])-1
+        print("{}: {} ".format(element[0],element[1]))
+        print("Limite inferior {}".format(inferior_limit))
+        print("Limite superior {}".format(superior_limit))    
+        if current_topic.upper() == element[0].upper():
+            print("Etiquetado con categoria {}".format(element[0]))
+            correct_inferior_limit = inferior_limit
+            correct_superior_limit = superior_limit
+            if question_index >= inferior_limit and question_index <= superior_limit:
+                print("Esta en el rango correcto")
+            else:
+                print("No está en el rango correcto")
+                # if is no in te correct category have to move to its inferior num  
+                print("Moviendo {} a {}".format(str(question_index+1),str(correct_inferior_limit+1)))
+                source_question_dragable = chrome.find_element(By.CSS_SELECTOR,"ul > li:nth-child("+str(question_index+1)+") > div > div:nth-child(5) > div > span.udi.udi-bars")
+                target_question_dragable = chrome.find_element(By.CSS_SELECTOR,"ul > li:nth-child("+str(correct_inferior_limit+1)+") > div")
+                ActionChains(chrome).drag_and_drop(source_question_dragable, target_question_dragable).perform()  
+        inferior_limit = superior_limit + 1
+    
+
+question_index = 1   
+correct_inferior_limit = 10
+
+
+
+
+
+# Print ranges topics
+inferior_limit = 0
+superior_limit = 0
+for element in topics_order_values:   
+        superior_limit = inferior_limit + int(element[1])-1
+        print("{}: {}".format(element[0],element[1]))
+        print("Limite inferior {}".format(inferior_limit))
+        print("Limite superior {}".format(superior_limit)) 
+        inferior_limit = superior_limit + 1    
+
+exam_knowledge_areas = []
+questions_no_explain = []
+for question_index in range(0,len(questions)-1): 
+    # Open sender question    
+    pencil_buttons = exam_sections[exam_index].find_elements(By.CSS_SELECTOR, 'div.quiz-editor--quiz-editor--2RKDC.default-item-editor--item-editor--3GhNq > div.default-item-editor--edit-content--HLXOq > div > div.quiz-editor--assessment-list--AusWI > ul > li')
+    pencil_button = pencil_buttons[question_index].find_element(By.CSS_SELECTOR, 'span.udi.udi-pencil')
+    driver.execute_script("arguments[0].click();", pencil_button)
+    # Check topic
+    topic_radios = WebDriverWait(chrome, 20).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "form > div:nth-child(4) > div > label > input[type=radio]")))
+    knowledge_areas = chrome.find_elements_by_css_selector("#knowledge-area")
+    print("Number of topics {}".format(len(topic_radios)))
+    for index in range(len(topic_radios)):
+        if topic_radios[index].is_selected() and knowledge_areas[index].get_attribute('value'):
+            exam_knowledge_areas.append(knowledge_areas[index].get_attribute('value'))
+    # Check explanaition If is empty only have one
+    question_explainantion = WebDriverWait(chrome, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "form > div:nth-child(3) > div > div.rt-editor.rt-editor--wysiwyg-mode > div")))
+    if len(question_explainantion.find_elements(By.TAG_NAME,'p')) == 1:
+        questions_no_explain.append(question_index)
+    # Close question
+    chrome.find_element_by_tag_name('html').send_keys(Keys.HOME) #Scrolls up to the top of the page   
+    sender_close_question_button = chrome.find_element(By.CSS_SELECTOR,"button[data-purpose^='content-tab-close']")
+    action = webdriver.ActionChains(chrome)
+    action.move_to_element(sender_close_question_button)
+    action.perform()
+    sender_close_question_button.click()
+# Pritn results
 counter=collections.Counter(exam_knowledge_areas)
 for line in counter:
     print("{}:\t{}".format(line,str(counter[line])))   
-
-print("Select the order of this topics:")   
-orders= dict.fromkeys(counter.keys())
-for line in orders:
-    print("{}".format(line))
-
-for line in orders:
-    orders[line] = input("{}: ".format(line))
-print("New order")
-for line in orders:
-    print("{} {}".format(orders[line],line))
-
-#practice-test5432158 > div > div.quiz-editor--quiz-editor--2RKDC.default-item-editor--item-editor--3GhNq > div.default-item-editor--add-content--1wZ-X > div > div.pl10.pr10.pb10 > div > form > div:nth-child(4) > div > label > input[type=radio]
-exam_index = 0
-chrome.execute_script("arguments[0].click();", WebDriverWait(chrome, 20).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'span.udi.udi-chevron-down')))[exam_index])
-relative_question_index = 120
-source_question_dragable = chrome.find_element_by_css_selector("ul > li:nth-child("+str(relative_question_index)+") > div > div:nth-child(5) > div > span.udi.udi-bars")
-
-#final_position = chrome.find_element_by_css_selector("ul > li:nth-child("+str(115)+") > div > div:nth-child(5) > div > span.udi.udi-bars").location
-
-source_question_dragable = chrome.find_element_by_css_selector("ul > li:nth-child("+str(relative_question_index)+") > div > div:nth-child(5) > div > span.udi.udi-bars")
-target_question_dragable = chrome.find_element_by_css_selector("ul > li:nth-child("+str(1)+") > div > div:nth-child(5) > div > span.udi.udi-bars")
-actions = ActionChains(driver)
-actions.drag_and_drop(source_question_dragable, target_question_dragable).perform()
-# Open the exam sender
-
-
-        if answer_radio_input1.is_selected():
-        
-
-
-print(questions[0].get_attribute('innetHTML'))
-print(questions[0].innerHTML)
-#exam_index = 1
-#questions = exam_sections[exam_index].find_elements(By.CSS_SELECTOR, 'div.quiz-editor--quiz-editor--2RKDC.default-item-editor--item-editor--3GhNq > div.default-item-editor--edit-content--HLXOq > div > div.quiz-editor--assessment-list--AusWI > ul > li > div')
-
-# Open the exam sender
-chrome1.execute_script("arguments[0].click();", WebDriverWait(chrome1, 20).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'span.udi.udi-chevron-down')))[exam_index])
-    
 
 def show_exam_distribution(driver):
     exam_url = input("Input exam content url:")    
@@ -480,10 +548,19 @@ def transfer_all_exams_pack(user1, password1, content1, user2, password2, conten
     
 
 def main():
-# Open and configure drivers
+    # Open and configure drivers
+    show_intro()
+    show_menu()
+    selection = input()
+
+
+
 dn = os.getcwd()
 chrome = configure_chrome_driver_no_profile(dn)
-show_intro()
+
+
+
+
 email = input("Input your udemy email:")
 password = input("Input your udemy password:")
 login_into_udemy(chrome, email, password)
