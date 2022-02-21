@@ -161,7 +161,8 @@ def prepare_exam(chrome,):
         topics_order[i] = topic_info
     
     # execute order
-    #for question_index in range(0,len(questions)-1): 
+    #for question_index in range(0,len(questions)-1):
+    number_total_topiccs = 0 
     for question_index in range(0,10): 
         exam_sections = chrome.find_elements(By.CSS_SELECTOR, "li[id*='practice-test']")
         questions = exam_sections[exam_index].find_elements(By.CSS_SELECTOR, 'div.quiz-editor--quiz-editor--2RKDC.default-item-editor--item-editor--3GhNq > div.default-item-editor--edit-content--HLXOq > div > div.quiz-editor--assessment-list--AusWI > ul > li > div')
@@ -172,7 +173,7 @@ def prepare_exam(chrome,):
         # Check topic
         topic_radios = WebDriverWait(chrome, 20).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "form > div:nth-child(4) > div > label > input[type=radio]")))
         knowledge_areas = chrome.find_elements(By.CSS_SELECTOR,"#knowledge-area")
-        print("Number of topics {}".format(len(topic_radios)-1))
+        number_total_topiccs = len(topic_radios)-1
         current_topic = ""
         for index in range(len(topic_radios)):
             if topic_radios[index].is_selected() and knowledge_areas[index].get_attribute('value'):
@@ -212,10 +213,6 @@ def prepare_exam(chrome,):
             inferior_limit = superior_limit + 1
     question_index = 1   
     correct_inferior_limit = 10
-    
-    
-    
-    
     
     # Print ranges topics
     inferior_limit = 0
@@ -273,14 +270,16 @@ def exam_sugestions():
     exam_url = input("Input exam content url:") # Example https://www.udemy.com/instructor/course/4444014/manage/practice-tests   
     chrome.get(exam_url)
     
-    # Remove Chat from pages
+    # Remove Chat from pages    
     try:
-    	chrome.execute_script(""" var element = document.querySelector("#Embed > div"); element.parentNode.removeChild(element); """, element)
+        WebDriverWait(chrome, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#Embed > div")))
+        chrome.execute_script(""" var iframes = document.querySelectorAll('iframe'); for (var i = 0; i < iframes.length; i++) { iframes[i].parentNode.removeChild(iframes[i]); } """, element)
+        chrome.execute_script(""" var element = document.querySelector("#Embed > div"); element.parentNode.removeChild(element); """, element)
         chrome.execute_script(""" var element = document.querySelector("#launcher"); element.parentNode.removeChild(element); """, element)
         print('Chat found and deleted.')
     except:
         print('Chat element not found.')
-    
+
     try:
         uncollapse_exams(chrome)
     except:
@@ -312,18 +311,17 @@ def exam_sugestions():
     # Print ranges topics
     inferior_limit = 0
     superior_limit = 0
-    topics_order_values = topics_order.values()
+    topics_order_values = topics_order.values()     
     print("\n")
     for element in topics_order_values:   
             superior_limit = inferior_limit + int(element[1])-1
-            print("{}: {}".format(element[0],element[1]))
-            print("Limite inferior {}".format(inferior_limit+1))
-            print("Limite superior {}".format(superior_limit+1)) 
-            inferior_limit = superior_limit + 1   
+            inferior_limit = superior_limit + 1  
+    
+    
+    limits_list = []
     exam_knowledge_areas = []
     questions_no_explain = []
-    print("\n")
-
+    number_total_topiccs = 0
     cprint.info("Analizando reactivos...\n")
     for question_index in range(0,len(questions)): 
         print("Reactivo {}".format(str(question_index+1)))
@@ -335,12 +333,13 @@ def exam_sugestions():
         topic_radios = WebDriverWait(chrome, 20).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "form > div:nth-child(4) > div > label > input[type=radio]")))
         knowledge_areas = chrome.find_elements(By.CSS_SELECTOR,"#knowledge-area")
         if question_index == 0:
-        	print("Number of topics {}".format(len(topic_radios)-1))
+            number_total_topiccs = len(topic_radios)-1
         current_topic = ""
         for index in range(len(topic_radios)):
             if topic_radios[index].is_selected() and knowledge_areas[index].get_attribute('value'):
                 current_topic = knowledge_areas[index].get_attribute('value')
-        print("Categoría actual: {}".format(current_topic))
+                exam_knowledge_areas.append(knowledge_areas[index].get_attribute('value'))
+        #print("Categoría actual: {}".format(current_topic))
         # Check explanaition If is empty only have one
         question_explainantion = WebDriverWait(chrome, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "form > div:nth-child(3) > div > div.rt-editor.rt-editor--wysiwyg-mode > div")))
         if len(question_explainantion.find_elements(By.TAG_NAME,'p')) == 1:
@@ -351,19 +350,23 @@ def exam_sugestions():
         inferior_limit = 0
         superior_limit = 0
         correct_inferior_limit = 0
-        correct_superior_limit = 0
+        correct_superior_limit = 0        
+        limit= [0,0]
         for element in topics_order_values:   
             superior_limit = inferior_limit + int(element[1])-1   
             if current_topic.upper() == element[0].upper():
-                print("Etiquetado con categoria {}".format(element[0]))
+                #print("Etiquetado con categoria {}".format(element[0]))
                 correct_inferior_limit = inferior_limit
                 correct_superior_limit = superior_limit
                 if question_index >= inferior_limit and question_index <= superior_limit:
                     print("Esta en el rango correcto")
                 else:
                     print("No está en el rango correcto")
-                    # if is no in te correct category have to move to its inferior num  
-                    print("Se debería mover {} a {}".format(str(question_index+1),str(correct_inferior_limit+1)))
+                    # if is no in te correct category have to move to its inferior num 
+                    limit[0] = question_index+1
+                    limit[1] = correct_inferior_limit+1
+                    limits_list.append(limit)
+                    #print("Se debería mover {} a {}".format(str(question_index+1),str(correct_inferior_limit+1)))
             inferior_limit = superior_limit + 1
         # Close question
         chrome.find_element(By.TAG_NAME,'html').send_keys(Keys.HOME) #Scrolls up to the top of the page   
@@ -372,11 +375,36 @@ def exam_sugestions():
         action.move_to_element(sender_close_question_button)
         action.perform()
         sender_close_question_button.click()
-        print("\n------------\n")
+        print("------------")
     # Print results
+    print("\n\n\nNumber of topics: {}".format(number_total_topiccs))
+    # Show distribution
+    print("\n\nDistribución actual:") 
     counter=collections.Counter(exam_knowledge_areas)
     for line in counter:
-        print("{}:\t{}".format(line,str(counter[line])))   
+        print("{}:\t{}".format(line,str(counter[line])))
+    # Print ranges topics
+    inferior_limit = 0
+    superior_limit = 0
+    topics_order_values = topics_order.values() 
+    print("\n\nRangos de categorias deseado:")
+    for element in topics_order_values:   
+            limits = []
+            superior_limit = inferior_limit + int(element[1])-1
+            print("{}: {}".format(element[0],element[1]))
+            print("Limite inferior {}".format(inferior_limit+1))
+            print("Limite superior {}".format(superior_limit+1)) 
+            inferior_limit = superior_limit + 1
+    
+    # Print movements
+    print("\nMovimiento sugeridos de reactivos:")    
+    for element in limits_list:
+        print("Se debería mover {} a {}".format(str(element[0]),str(element[1])))
+    # Print no explained 
+    print("\nReactivos sin explicación redactada:")
+    for element in questions_no_explain:
+        print(str(element))
+    
     
 
 # REce ie exams URL and an recdier URL exames copy one name examen in other name
@@ -702,7 +730,7 @@ def show_menu():
 
 
 def execute_selection(selection):   
-	print("Executing...")
+    print("Executing...")
 
 def main():
     # Open and configure drivers
