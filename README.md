@@ -8,6 +8,12 @@ To make it easy for you to get started with GitLab, here's a list of recommended
 
 ![Alt Text](https://github.com/osvaldohdzm/Udetools/blob/main/Untitled%20Project.gif?raw=true)
 
+
+
+Download Chrome portable on Chrome folder to not install Chrome in your computer.
+
+https://portableapps.com/apps/internet/google-chrome-portable-64
+
 ## Add your files
 
 - [ ] [Create](https://gitlab.com/-/experiment/new_project_readme_content:ff0446332993b0b60086d609f2a77501?https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://gitlab.com/-/experiment/new_project_readme_content:ff0446332993b0b60086d609f2a77501?https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
