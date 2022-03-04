@@ -16,7 +16,6 @@ import chromedriver_autoinstaller
 import art 
 import argparse
 import pwinput
-import sys
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
@@ -36,7 +35,18 @@ from selenium import webdriver
 from os.path import abspath
 from inspect import getmembers
 from datetime import datetime, timedelta
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
+
+dn = os.getcwd()
+
+def driver_alive(driver):
+    try:
+        driver.title
+        return True
+    except:
+        return False
 
 def configure_firefox_driver_profile(dn, profile_folder_path):
     options = Options()
@@ -73,6 +83,8 @@ def configure_firefox_driver_no_profile(dn):
 
 
 def configure_chrome_driver_no_profile(dn):
+#    s=Service(ChromeDriverManager().install())
+    service = Service(os.path.join(dn,r"Chrome\GoogleChromePortable64\GoogleChromePortable.exe"))
     options = webdriver.ChromeOptions()
     options.add_argument("--log-level=3")
     options.add_argument("ignore-certificate-errors")
@@ -83,7 +95,7 @@ def configure_chrome_driver_no_profile(dn):
     options.add_argument("disable-infobars")
     options.add_experimental_option('useAutomationExtension', False)
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    chrome = webdriver.Chrome(options=options, executable_path="ChromeDriver 98.0.4758.80.exe")
+    chrome = webdriver.Chrome(options=options, service=service)
     return chrome
 
 
@@ -102,12 +114,21 @@ def uncollapse_exams(chrome):
 
 
 def login_into_udemy(chrome, email, password):
-    chrome.get("https://www.udemy.com")
-    WebDriverWait(chrome, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div.main-content-wrapper > div.ud-app-loader.ud-component--header-v6--header.udlite-header.ud-app-loaded > div.udlite-text-sm.header--header--3sK1h.header--flex-middle--2Xqjv > div:nth-child(8) > a > span'))).click()
-    WebDriverWait(chrome, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, '#email--1'))).send_keys(email)
-    WebDriverWait(chrome, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, '#id_password'))).send_keys(password)
-    WebDriverWait(chrome, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, '#submit-id-submit'))).click()
-    input("\nPausa en caso de reconocimiento de robot, presiona enter...")
+    status = driver_alive(chrome)
+    if not status:        
+        chrome = configure_chrome_driver_no_profile(dn)
+        chrome.minimize_window()   
+    try:
+        chrome.get("https://www.udemy.com")
+        WebDriverWait(chrome, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div.main-content-wrapper > div.ud-app-loader.ud-component--header-v6--header.udlite-header.ud-app-loaded > div.udlite-text-sm.header--header--3sK1h.header--flex-middle--2Xqjv > div:nth-child(8) > a > span'))).click()
+        WebDriverWait(chrome, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, '#email--1'))).send_keys(email)
+        WebDriverWait(chrome, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, '#id_password'))).send_keys(password)
+        WebDriverWait(chrome, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, '#submit-id-submit'))).click()
+        input("\nPausa en caso de reconocimiento de robot realiza lo que se te pide, luego presiona enter...")
+    except:
+        print("An exception occurred with login")
+    return chrome
+
 
 def show_intro():
     banner = art.text2art("UDETOOL")
@@ -115,199 +136,61 @@ def show_intro():
     print("Starting...\n")
 
 
-
-
-def prepare_exam(chrome,):
-    dn = os.getcwd()
-    print("Opening selenium...")
-    chrome = configure_chrome_driver_no_profile(dn)
-    email = input("Input your udemy email:")
-    password = pwinput.pwinput(prompt='Input your udemy password:', mask='*')
-    login_into_udemy(chrome, email, password)
-    
-    exam_url = input("Input exam content url:") # Example https://www.udemy.com/instructor/course/4444014/manage/practice-tests   
-    chrome.get(exam_url)
-    
-    # Remove Chat from pages
-    try:
-        element = WebDriverWait(chrome, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, '#webWidget')))
-        chrome.execute_script(""" var element = arguments[0]; element.parentNode.removeChild(element); """, element)
-        print('Chat element deleted')
-    except:
-        print('Chat element not found')
-    
-    try:
-        uncollapse_exams(chrome)
-    except:
-        print('Contents already colapsed')
-    
-     
-    
-    exam_index = 0
-    exam_sections = chrome.find_elements(By.CSS_SELECTOR, "li[id*='practice-test']")
-    print("Number of elements detected {}".format(len(exam_sections)))
-    
-    questions = exam_sections[exam_index].find_elements(By.CSS_SELECTOR, 'div.quiz-editor--quiz-editor--2RKDC.default-item-editor--item-editor--3GhNq > div.default-item-editor--edit-content--HLXOq > div > div.quiz-editor--assessment-list--AusWI > ul > li > div')
-    print("Number of questions detected {} in exam {}".format(len(questions), str(exam_index)))
-    
-    
-    # Order questiosn to his category
-    print("Introduce las materias o categorías en el orden deseado:")
-    topics_order = {}
-    for i in range(9):    
-        topic_info = []
-        topic_info.append(input("Nombre de {} :".format(str(i))).upper())
-        topic_info.append(int(input("Num de reactivos:")))
-        topics_order[i] = topic_info
-    
-    # execute order
-    #for question_index in range(0,len(questions)-1):
-    number_total_topiccs = 0 
-    for question_index in range(0,10): 
-        exam_sections = chrome.find_elements(By.CSS_SELECTOR, "li[id*='practice-test']")
-        questions = exam_sections[exam_index].find_elements(By.CSS_SELECTOR, 'div.quiz-editor--quiz-editor--2RKDC.default-item-editor--item-editor--3GhNq > div.default-item-editor--edit-content--HLXOq > div > div.quiz-editor--assessment-list--AusWI > ul > li > div')
-        # Open sender question    
-        pencil_buttons = exam_sections[exam_index].find_elements(By.CSS_SELECTOR, 'div.quiz-editor--quiz-editor--2RKDC.default-item-editor--item-editor--3GhNq > div.default-item-editor--edit-content--HLXOq > div > div.quiz-editor--assessment-list--AusWI > ul > li')
-        pencil_button = pencil_buttons[question_index].find_element(By.CSS_SELECTOR, 'span.udi.udi-pencil')
-        chrome.execute_script("arguments[0].click();", pencil_button)
-        # Check topic
-        topic_radios = WebDriverWait(chrome, 20).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "form > div:nth-child(4) > div > label > input[type=radio]")))
-        knowledge_areas = chrome.find_elements(By.CSS_SELECTOR,"#knowledge-area")
-        number_total_topiccs = len(topic_radios)-1
-        current_topic = ""
-        for index in range(len(topic_radios)):
-            if topic_radios[index].is_selected() and knowledge_areas[index].get_attribute('value'):
-                current_topic = knowledge_areas[index].get_attribute('value')
-        print("Categoría actual: {}".format(current_topic))
-        # Closed question check the position
-        chrome.find_element_by_tag_name('html').send_keys(Keys.HOME) #Scrolls up to the top of the page   
-        sender_close_question_button = chrome.find_element(By.CSS_SELECTOR,"button[data-purpose^='content-tab-close']")
-        action = webdriver.ActionChains(chrome)
-        action.move_to_element(sender_close_question_button)
-        action.perform()
-        sender_close_question_button.click()
-        # Verrify if index question in correct range
-        topics_order_values = topics_order.values()
-        inferior_limit = 0
-        superior_limit = 0
-        correct_inferior_limit = 0
-        correct_superior_limit = 0
-        for element in topics_order_values:   
-            superior_limit = inferior_limit + int(element[1])-1
-            print("{}: {} ".format(element[0],element[1]))
-            print("Limite inferior {}".format(inferior_limit))
-            print("Limite superior {}".format(superior_limit))    
-            if current_topic.upper() == element[0].upper():
-                print("Etiquetado con categoria {}".format(element[0]))
-                correct_inferior_limit = inferior_limit
-                correct_superior_limit = superior_limit
-                if question_index >= inferior_limit and question_index <= superior_limit:
-                    print("Esta en el rango correcto")
-                else:
-                    print("No está en el rango correcto")
-                    # if is no in te correct category have to move to its inferior num  
-                    print("Moviendo {} a {}".format(str(question_index+1),str(correct_inferior_limit+1)))
-                    source_question_dragable = chrome.find_element(By.CSS_SELECTOR,"ul > li:nth-child("+str(question_index+1)+") > div > div:nth-child(5) > div > span.udi.udi-bars")
-                    target_question_dragable = chrome.find_element(By.CSS_SELECTOR,"ul > li:nth-child("+str(correct_inferior_limit+1)+") > div")
-                    ActionChains(chrome).drag_and_drop(source_question_dragable, target_question_dragable).perform()  
-            inferior_limit = superior_limit + 1
-    question_index = 1   
-    correct_inferior_limit = 10
-    
-    # Print ranges topics
-    inferior_limit = 0
-    superior_limit = 0
-    for element in topics_order_values:   
-            superior_limit = inferior_limit + int(element[1])-1
-            print("{}: {}".format(element[0],element[1]))
-            print("Limite inferior {}".format(inferior_limit))
-            print("Limite superior {}".format(superior_limit)) 
-            inferior_limit = superior_limit + 1    
-    
-    exam_knowledge_areas = []
-    questions_no_explain = []
-    for question_index in range(0,len(questions)-1): 
-        # Open sender question    
-        pencil_buttons = exam_sections[exam_index].find_elements(By.CSS_SELECTOR, 'div.quiz-editor--quiz-editor--2RKDC.default-item-editor--item-editor--3GhNq > div.default-item-editor--edit-content--HLXOq > div > div.quiz-editor--assessment-list--AusWI > ul > li')
-        pencil_button = pencil_buttons[question_index].find_element(By.CSS_SELECTOR, 'span.udi.udi-pencil')
-        chrome.execute_script("arguments[0].click();", pencil_button)
-        # Check topic
-        topic_radios = WebDriverWait(chrome, 20).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "form > div:nth-child(4) > div > label > input[type=radio]")))
-        knowledge_areas = chrome.find_elements_by_css_selector("#knowledge-area")
-        print("Number of topics {}".format(len(topic_radios)))
-        for index in range(len(topic_radios)):
-            if topic_radios[index].is_selected() and knowledge_areas[index].get_attribute('value'):
-                exam_knowledge_areas.append(knowledge_areas[index].get_attribute('value'))
-        # Check explanaition If is empty only have one
-        question_explainantion = WebDriverWait(chrome, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "form > div:nth-child(3) > div > div.rt-editor.rt-editor--wysiwyg-mode > div")))
-        if len(question_explainantion.find_elements(By.TAG_NAME,'p')) == 1:
-            questions_no_explain.append(question_index)
-        # Close question
-        chrome.find_element_by_tag_name('html').send_keys(Keys.HOME) #Scrolls up to the top of the page   
-        sender_close_question_button = chrome.find_element(By.CSS_SELECTOR,"button[data-purpose^='content-tab-close']")
-        action = webdriver.ActionChains(chrome)
-        action.move_to_element(sender_close_question_button)
-        action.perform()
-        sender_close_question_button.click()
-    # Pritn results
-    counter=collections.Counter(exam_knowledge_areas)
-    for line in counter:
-        print("{}:\t{}".format(line,str(counter[line])))   
+def move_question(driver,exam_num, origin_question, destiny_question, offset):
+    try: 
+        if (destiny_question+offset) <= 0:
+            offset = 0
+            destiny_question = 1
+        print("Moviendo {} a {}".format(str(origin_question),str(destiny_question)))    
+        exam_section = driver.find_element(By.CSS_SELECTOR,"div > div:nth-of-type(2) > ul > li:nth-of-type("+str(exam_num+1)+")")        
+        source_question_dragable = exam_section.find_element(By.CSS_SELECTOR,"ul > li:nth-child("+str(origin_question)+") > div > div:nth-child(5) > div > span.udi.udi-bars")
+        target_question_dragable = exam_section.find_element(By.CSS_SELECTOR,"ul > li:nth-child("+str(destiny_question+offset)+") > div > div.ellipsis.mr5")
+        ActionChains(driver).drag_and_drop(source_question_dragable, target_question_dragable).perform() 
+    except Exception as e: 
+        print(e)
+        print('Cannot move element')
 
 def show_exam_distribution(chrome):
     exam_url = input("Input exam content url:")    
     get_exam_distribution(chrome,exam_url)
 
 
-def exam_sugestions():
-    dn = os.getcwd()
-    print("Opening selenium...")
-    chrome = configure_chrome_driver_no_profile(dn)
-    chrome.minimize_window()
-    email = input("Input your udemy email:")
-    password = pwinput.pwinput(prompt='Input your udemy password:', mask='*')
-    login_into_udemy(chrome, email, password)    
+def exam_sugestions(chrome):
     exam_url = input("Input exam content url:") # Example https://www.udemy.com/instructor/course/4444014/manage/practice-tests   
-    chrome.get(exam_url)
-    
+    chrome.get(exam_url)    
     # Remove Chat from pages    
     try:
-        WebDriverWait(chrome, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#Embed > div")))
-        chrome.execute_script(""" var iframes = document.querySelectorAll('iframe'); for (var i = 0; i < iframes.length; i++) { iframes[i].parentNode.removeChild(iframes[i]); } """, element)
-        chrome.execute_script(""" var element = document.querySelector("#Embed > div"); element.parentNode.removeChild(element); """, element)
-        chrome.execute_script(""" var element = document.querySelector("#launcher"); element.parentNode.removeChild(element); """, element)
-        print('Chat found and deleted.')
+        WebDriverWait(chrome, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "#webWidget")))
+        chrome.execute_script(""" var iframes = document.querySelectorAll('iframe'); for (var i = 0; i < iframes.length; i++) { iframes[i].parentNode.removeChild(iframes[i]); } """)
+        chrome.execute_script(""" var element = document.querySelector("#Embed > div"); element.parentNode.removeChild(element); """)
+        chrome.execute_script(""" var element = document.querySelector("#launcher"); element.parentNode.removeChild(element); """)
+        print('Elemnto de chat eliminado.')
     except:
-        print('Chat element not found.')
-
+        print('No se encontró el elemento del chat pero se ejecuto el script de eliminación de todas formas.')
+        chrome.execute_script(""" var iframes = document.querySelectorAll('iframe'); for (var i = 0; i < iframes.length; i++) { iframes[i].parentNode.removeChild(iframes[i]); } """)
     try:
+        print("Uncollapsing exams for other procedures...")
         uncollapse_exams(chrome)
     except:
         print('Contents already colapsed')
-    
-     
-    exam_index_input = input("Introduce el número de examen a analizar (ej. 1):")
+    exam_index_input = input("\nIntroduce el número de examen a analizar (ej. 1):")
     exam_index = int(exam_index_input)-1
     exam_sections = chrome.find_elements(By.CSS_SELECTOR, "li[id*='practice-test']")
     print("Number of elements detected {}".format(len(exam_sections)))
     questions = exam_sections[exam_index].find_elements(By.CSS_SELECTOR, 'div.quiz-editor--quiz-editor--2RKDC.default-item-editor--item-editor--3GhNq > div.default-item-editor--edit-content--HLXOq > div > div.quiz-editor--assessment-list--AusWI > ul > li > div')
     print("Number of questions detected {} in exam {}".format(len(questions), exam_index_input))
-
     # Open the exam sender
     print("Abriendo examen...")
     chrome.execute_script("arguments[0].click();", WebDriverWait(chrome, 20).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'span.udi.udi-chevron-down')))[exam_index])
-    input("Pause")
-        
+       
     # Order questiosn to his category
-    print("Introduce las materias o categorías en el orden deseado:")
+    print("Introduce las materias o categorías en el orden deseado:\n")
     topics_order = {}
     for i in range(9):    
         topic_info = []
-        topic_info.append(input("Nombre de {} :".format(str(i))).upper())
+        topic_info.append(input("Nombre de categoría {} :".format(str(i+1))).upper())
         topic_info.append(int(input("Num de reactivos:")))
-        topics_order[i] = topic_info
-    
-
+        topics_order[i] = topic_info  
     # Print ranges topics
     inferior_limit = 0
     superior_limit = 0
@@ -316,66 +199,72 @@ def exam_sugestions():
     for element in topics_order_values:   
             superior_limit = inferior_limit + int(element[1])-1
             inferior_limit = superior_limit + 1  
-    
-    
-    limits_list = []
+    movements = []
     exam_knowledge_areas = []
     questions_no_explain = []
     number_total_topiccs = 0
     cprint.info("Analizando reactivos...\n")
-    for question_index in range(0,len(questions)): 
-        print("Reactivo {}".format(str(question_index+1)))
-        # Open sender question    
-        pencil_buttons = exam_sections[exam_index].find_elements(By.CSS_SELECTOR, 'div.quiz-editor--quiz-editor--2RKDC.default-item-editor--item-editor--3GhNq > div.default-item-editor--edit-content--HLXOq > div > div.quiz-editor--assessment-list--AusWI > ul > li')
-        pencil_button = pencil_buttons[question_index].find_element(By.CSS_SELECTOR, 'span.udi.udi-pencil')
-        chrome.execute_script("arguments[0].click();", pencil_button)
-        # Check topic
-        topic_radios = WebDriverWait(chrome, 20).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "form > div:nth-child(4) > div > label > input[type=radio]")))
-        knowledge_areas = chrome.find_elements(By.CSS_SELECTOR,"#knowledge-area")
-        if question_index == 0:
-            number_total_topiccs = len(topic_radios)-1
-        current_topic = ""
-        for index in range(len(topic_radios)):
-            if topic_radios[index].is_selected() and knowledge_areas[index].get_attribute('value'):
-                current_topic = knowledge_areas[index].get_attribute('value')
-                exam_knowledge_areas.append(knowledge_areas[index].get_attribute('value'))
-        #print("Categoría actual: {}".format(current_topic))
-        # Check explanaition If is empty only have one
-        question_explainantion = WebDriverWait(chrome, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "form > div:nth-child(3) > div > div.rt-editor.rt-editor--wysiwyg-mode > div")))
-        if len(question_explainantion.find_elements(By.TAG_NAME,'p')) == 1:
-            questions_no_explain.append(question_index)
-            print("El reactivo {} no tiene explicación redactada!".format(str(question_index+1)))
-        # Check correct order
-        topics_order_values = topics_order.values()
-        inferior_limit = 0
-        superior_limit = 0
-        correct_inferior_limit = 0
-        correct_superior_limit = 0        
-        limit= [0,0]
-        for element in topics_order_values:   
-            superior_limit = inferior_limit + int(element[1])-1   
-            if current_topic.upper() == element[0].upper():
-                #print("Etiquetado con categoria {}".format(element[0]))
-                correct_inferior_limit = inferior_limit
-                correct_superior_limit = superior_limit
-                if question_index >= inferior_limit and question_index <= superior_limit:
-                    print("Esta en el rango correcto")
-                else:
-                    print("No está en el rango correcto")
-                    # if is no in te correct category have to move to its inferior num 
-                    limit[0] = question_index+1
-                    limit[1] = correct_inferior_limit+1
-                    limits_list.append(limit)
-                    #print("Se debería mover {} a {}".format(str(question_index+1),str(correct_inferior_limit+1)))
-            inferior_limit = superior_limit + 1
-        # Close question
-        chrome.find_element(By.TAG_NAME,'html').send_keys(Keys.HOME) #Scrolls up to the top of the page   
-        sender_close_question_button = chrome.find_element(By.CSS_SELECTOR,"button[data-purpose^='content-tab-close']")
-        action = webdriver.ActionChains(chrome)
-        action.move_to_element(sender_close_question_button)
-        action.perform()
-        sender_close_question_button.click()
-        print("------------")
+    for question_index in range(0,len(questions)):
+        try: 
+            print("Reactivo {}".format(str(question_index+1)))
+            # Open sender question    
+            pencil_buttons = exam_sections[exam_index].find_elements(By.CSS_SELECTOR, 'div.quiz-editor--quiz-editor--2RKDC.default-item-editor--item-editor--3GhNq > div.default-item-editor--edit-content--HLXOq > div > div.quiz-editor--assessment-list--AusWI > ul > li')
+            pencil_button = pencil_buttons[question_index].find_element(By.CSS_SELECTOR, 'span.udi.udi-pencil')
+            chrome.execute_script("arguments[0].click();", pencil_button)
+            # Check topic
+            topic_radios = WebDriverWait(chrome, 20).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "form > div:nth-child(4) > div > label > input[type=radio]")))
+            knowledge_areas = chrome.find_elements(By.CSS_SELECTOR,"#knowledge-area")
+            if question_index == 0:
+                number_total_topiccs = len(topic_radios)-1
+            current_topic = ""
+            for index in range(len(topic_radios)):
+                if topic_radios[index].is_selected() and knowledge_areas[index].get_attribute('value'):
+                    current_topic = knowledge_areas[index].get_attribute('value')
+                    exam_knowledge_areas.append(knowledge_areas[index].get_attribute('value'))
+            #print("Categoría actual: {}".format(current_topic))
+            # Check explanaition If is empty only have one
+            question_explainantion = WebDriverWait(chrome, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "form > div:nth-child(3) > div > div.rt-editor.rt-editor--wysiwyg-mode > div")))
+            if len(question_explainantion.find_elements(By.TAG_NAME,'p')) == 1:
+                questions_no_explain.append(question_index)
+                print("El reactivo {} no tiene explicación redactada!".format(str(question_index+1)))
+            # Check correct order
+            topics_order_values = topics_order.values()
+            inferior_limit = 0
+            superior_limit = 0
+            correct_inferior_limit = 0
+            correct_superior_limit = 0        
+            limit= [0,0,0,0]
+            for element in topics_order_values:   
+                superior_limit = inferior_limit + int(element[1])-1   
+                if current_topic.upper() == element[0].upper():
+                    #print("Etiquetado con categoria {}".format(element[0]))
+                    correct_inferior_limit = inferior_limit
+                    correct_superior_limit = superior_limit
+                    if question_index >= inferior_limit and question_index <= superior_limit:
+                        print("Esta en el rango correcto")
+                    else:
+                        print("No está en el rango correcto")
+                        limit[0] = question_index+1
+                        if question_index < correct_inferior_limit:                            
+                            limit[1] = correct_superior_limit+1
+                        if question_index > correct_superior_limit:
+                            limit[1] = correct_inferior_limit+1
+                        limit[2] = correct_inferior_limit+1
+                        limit[3] = correct_superior_limit+1
+                        movements.append(limit)
+                        #print("Se debería mover {} a {}".format(str(question_index+1),str(correct_inferior_limit+1)))
+                inferior_limit = superior_limit + 1
+            # Close question   
+            chrome.find_element(By.TAG_NAME,'html').send_keys(Keys.HOME) #Scrolls up to the top of the page   
+            sender_close_question_button = chrome.find_elements(By.CSS_SELECTOR,"button[data-purpose^='content-tab-close']")[exam_index]
+            action = webdriver.ActionChains(chrome)
+            action.move_to_element(sender_close_question_button)
+            action.perform()
+            sender_close_question_button.click()
+            print("------------")
+        except Exception as e: 
+            print(e)   
+            print('Error in question move next')
     # Print results
     print("\n\n\nNumber of topics: {}".format(number_total_topiccs))
     # Show distribution
@@ -395,16 +284,20 @@ def exam_sugestions():
             print("Limite inferior {}".format(inferior_limit+1))
             print("Limite superior {}".format(superior_limit+1)) 
             inferior_limit = superior_limit + 1
-    
     # Print movements
-    print("\nMovimiento sugeridos de reactivos:")    
-    for element in limits_list:
-        print("Se debería mover {} a {}".format(str(element[0]),str(element[1])))
+    print("\nMovimiento sugeridos de reactivos:")
+    if not movements:
+       print("No hay movimientos sugeridos.")    
+    else:        
+        for element in movements:
+            print("Se debería mover {} a {}".format(str(element[0]),str(element[1])))
     # Print no explained 
     print("\nReactivos sin explicación redactada:")
+    if not questions_no_explain:
+        print("No hay reactivos sin redactar explicación.")
     for element in questions_no_explain:
         print(str(element))
-    
+    return movements
     
 
 # REce ie exams URL and an recdier URL exames copy one name examen in other name
@@ -685,8 +578,55 @@ def transfer_all_exams_pack(user1, password1, content1, user2, password2, conten
     receiver_close_exam_button.click()
     exam_index = exam_index +1
 
-def show_menu():
-    print ("Selecciona una opción")
+def update_movements(movements,origin_question,destiny_question):
+    print("Actualizando movimientos...")
+    try:
+        for move in movements:
+            if origin_question < destiny_question and move[0] <= destiny_question and move[0] >= origin_question:
+                move[0] = move[0]-1       
+            if origin_question > destiny_question and move[0] >= destiny_question and move[0] <= origin_question:
+                move[0] = move[0]+1  
+        movements.pop(0)
+        for move in movements:
+            if move[2] <= move[0] <= move[3]:
+                movements.remove(move)                    
+    except Exception as e: 
+        print(e)
+        print('No se pudieron actualizar los movimientos...')
+    return movements
+
+def apply_question_movements(chrome, exam_num, movements, offset): 
+    try:
+        index = 0
+        while movements:  
+            move_question(chrome, exam_num, movements[index][0], movements[index][1], offset)
+            movements = update_movements(movements, movements[index][0], movements[index][1])
+            index = index +1
+            try: 
+                publish_button = WebDriverWait(chrome, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div > div:nth-child(2) > button.udlite-btn.udlite-btn-small.udlite-btn-primary.udlite-heading-sm.mt5.mb5 > span")))
+                chrome.execute_script("arguments[0].click();", publish_button)
+                text_area = WebDriverWait(chrome, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div > form > div.modal-body > div:nth-child(1) > textarea")))
+                text_area.send_keys("Actualización")
+                submit_button = WebDriverWait(chrome, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div.fade.in.modal > div > div > form > div.modal-footer > button.btn.btn-secondary")))
+                chrome.execute_script("arguments[0].click();", submit_button)
+            except:
+                print('Error with publish button.')
+            time.sleep(3)
+        return movements
+    except Exception as e: 
+        print(e)
+
+def show_movements(movements):
+    print("\nMovimiento sugeridos de reactivos:")
+    if not movements:
+       print("No hay movimientos sugeridos.") 
+    else:
+        print("Total de {} movimientos".format(len(movements)))
+        for move in movements:
+            print("Se debería mover {} a {}".format(str(move[0]),str(move[1])))
+
+def show_menu(chrome,movements):
+    print ("\nSelecciona una opción")    
     print ("\t1 - Mostrar sugerencias de un examen.")
     print ("\t2 - Mostrar sugerencias de todos los exámenes.")
     print ("\t3 - Ordenar reactivos de examen según.")
@@ -694,48 +634,86 @@ def show_menu():
     print ("\t5 - Transferir examen de una cuenta a otra.")
     print ("\t6 - Transferir examen de un conjunto de exámenes a otro.")
     print ("\t7 - Duplicar examen dentro de un mismo conjunto de exámenes.")
+    print ("\t9 - Mover reactivo.")
+    print ("\t10 - Mostrar solo movimientos sugeridos.")
+    print ("\t11 - Iniciar sesión en UDEMY")
+    print ("\t12 - Aplicar todos los movimientos de reactivos.")
     print ("\t0 - Salir")
-    opcionshow_menu = input("Selecciona una opción >> ") 
+    opcionshow_menu = input("\nSelecciona una opción >> ") 
     if opcionshow_menu=="1":       
-        exam_sugestions()
+        movements = exam_sugestions(chrome)
         input("\nPulsa una tecla para continuar")
-        show_menu()
+        show_menu(chrome, movements)
     elif opcionshow_menu=="2":
         print("Trabajo en progreso.")
     elif opcionshow_menu=="3":        
         print("Trabajo en progreso.")
         input("\nPulsa una tecla para continuar")
-        show_menu()
+        show_menu(chrome, movements)
     elif opcionshow_menu=="4":
         print("Trabajo en progreso.")
         input("\nPulsa una tecla para continuar")
-        show_menu()
+        show_menu(chrome, movements)
     elif opcionshow_menu=="5":
         print("Trabajo en progreso.")
         input("\nPulsa una tecla para continuar")
-        show_menu()
+        show_menu(chrome, movements)
     elif opcionshow_menu=="6":
         print("Trabajo en progreso.")
         input("\nPulsa una tecla para continuar")
-        show_menu()
+        show_menu(chrome, movements)
     elif opcionshow_menu=="7":
         print("Trabajo en progreso.")
         input("\nPulsa una tecla para continuar")
-        show_menu()
+        show_menu(chrome, movements)
+    elif opcionshow_menu=="9":
+        try:
+            exam_num = int(input("Examn number: " ))
+            origin_question = int(input("Original position: " ))
+            destiny_question = int(input("Final position: "))
+            offset = int(input("Offset (default use 0): "))
+            move_question(chrome, exam_num, origin_question, destiny_question, offset)
+            movements = update_movements(movements,origin_question,destiny_question)
+            input("\nPulsa una tecla para continuar") 
+            show_menu(chrome, movements)           
+        except Exception as e: 
+            print(e)
+            show_menu(chrome, movements)  
+    elif opcionshow_menu=="10":
+        show_movements(movements)
+        input("\nPulsa una tecla para continuar")
+        show_menu(chrome, movements)
+    elif opcionshow_menu=="11":
+        email = input("Input your udemy email:")
+        password = pwinput.pwinput(prompt='Input your udemy password:', mask='*')
+        chrome = login_into_udemy(chrome, email, password)  
+        input("\nPulsa una tecla para continuar")
+        show_menu(chrome, movements)
+    elif opcionshow_menu=="12":
+        try:
+            exam_num = int(input("Exam number: " ))
+            offset = int(input("Introduce un valor de offset: "))
+            movements = apply_question_movements(chrome, exam_num, movements, offset)
+            input("\nPulsa una tecla para continuar") 
+            show_menu(chrome, movements)           
+        except Exception as e: 
+            print(e)
+            show_menu(chrome, movements)  
     elif opcionshow_menu=="0":
         exit()
     else:
         input("No has pulsado ninguna opción correcta...\nPulsa una tecla para continuar")
-        show_menu()
-
+        show_menu(chrome, movements)
 
 def execute_selection(selection):   
     print("Executing...")
 
 def main():
     # Open and configure drivers
-    show_intro()
-    show_menu()
+    show_intro()    
+    chrome = configure_chrome_driver_no_profile(dn)
+    chrome.minimize_window()   
+    show_menu(chrome, [])
     #selection = input()
     #execute_selection(selection)
 
